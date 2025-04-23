@@ -1065,7 +1065,7 @@ contains
             call mpas_pool_get_array(meshPool, "masksTSRegion", &
                               nMasksTSRegion)
             !call mpas_log_write( 'new MasksTS max = $i', intArgs=(/size(nMasksTSRegion)/))
-            write(*,*) 'max MasksTS', maxval(nMasksTSRegion)
+            !write(*,*) 'max MasksTS', maxval(nMasksTSRegion)
 
             ! Note: monthly surface salinity restoring is a special
             ! case for tracer restoring
