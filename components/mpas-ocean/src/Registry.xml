@@ -1925,6 +1925,8 @@
 			<var name="maxLevelCell"/>
 			<var name="refBottomDepth" packages="forwardMode;analysisMode"/>
 			<var name="restingThickness" packages="forwardMode;analysisMode"/>
+                        <var name="masksTSRegion"/>
+
 		</stream>
 
 		<stream name="input"
@@ -2801,7 +2803,7 @@
 			 description="Pre-computed wet fraction for each edge at given ssh value"
 			 packages="subgridWetDryPKG"
 		/>
-                <var name="masksTSRegion" type="integer" dimensions="nCells"
+                <var name="masksTSRegion" type="real" dimensions="nCells"
                          description="Region mask for restoring temperature and/or salinity. 1 in the region, 0 elsewhere."
                 />
 	</var_struct>

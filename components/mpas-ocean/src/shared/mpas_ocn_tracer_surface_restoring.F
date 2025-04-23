@@ -111,7 +111,7 @@ contains
          tracersSurfaceRestoringValue
 
       ! one dimensional arrays
-      integer, dimension(:), intent(in) :: &
+      real (kind=RKIND), dimension(:), intent(inout) :: &
           masksTSRegion
       !-----------------------------------------------------------------
       !
@@ -148,7 +148,7 @@ contains
         do iTracer=1,nTracers
 
           if (masksTSRegion(icell) == 1) then
-
+                write(*,*) 'mask inside tracer', masksTSRegion(icell)
                 ! For monthly salinity restoring, tracersSurfaceRestoringValue contains the zero-mean deltaS
                 if (trim(groupName) == 'activeTracers' &
                         .and. iTracer == indexSalinity   &
