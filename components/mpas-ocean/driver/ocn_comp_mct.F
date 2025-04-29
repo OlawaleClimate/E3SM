@@ -225,7 +225,7 @@ contains
     logical, pointer :: config_use_ecosysTracers
     logical, pointer :: config_use_CFCTracers
     logical, pointer :: config_use_activeTracers_surface_restoring
-    logical, pointer :: config_use_surface_salinity_monthly_restoring
+    logical, pointer :: config_use_surface_salinity_monthly_restoring, config_use_surface_temperature_monthly_restoring
     logical, pointer :: config_scale_dismf_by_removed_ice_runoff
     character (len=StrKIND), pointer :: config_land_ice_flux_mode
     character (len=StrKIND), pointer :: config_glc_thermal_forcing_coupling_mode
@@ -799,16 +799,26 @@ contains
         call mpas_timer_stop('io_CFC')
     endif
 
-    ! read initial data required for monthly surface salinity restoring
+    ! read initial data required for monthly surface salinity and temperature restoring
     call mpas_pool_get_config(domain % configs, 'config_use_activeTracers_surface_restoring',  &
                                                  config_use_activeTracers_surface_restoring)
     call mpas_pool_get_config(domain % configs, 'config_use_surface_salinity_monthly_restoring',  &
                                                  config_use_surface_salinity_monthly_restoring)
+    call mpas_pool_get_config(domain % configs, 'config_use_surface_temperature_monthly_restoring',  &
+                                                 config_use_surface_temperature_monthly_restoring)
+
     if (config_use_activeTracers_surface_restoring .and.  config_use_surface_salinity_monthly_restoring) then
         call mpas_timer_start('io_monthly_surface_salinity',.false.)
         call ocn_get_surfaceSalinityData(domain_ptr % streamManager, domain, domain % clock, .true.)
         call mpas_timer_stop('io_monthly_surface_salinity')
     endif
+
+    if (config_use_activeTracers_surface_restoring .and.  config_use_surface_temperature_monthly_restoring) then
+        call mpas_timer_start('io_monthly_surface_temperature',.false.)
+        call ocn_get_surfaceTemperatureData(domain_ptr % streamManager, domain, domain % clock, .true.)
+        call mpas_timer_stop('io_monthly_surface_temperature')
+    endif
+
 
     ! Setup clock for initial runs
     if ( runtype == 'initial' ) then
@@ -1027,7 +1037,7 @@ contains
       logical, pointer :: config_use_ecosysTracers
       logical, pointer :: config_use_CFCTracers
       logical, pointer :: config_use_activeTracers_surface_restoring
-      logical, pointer :: config_use_surface_salinity_monthly_restoring
+      logical, pointer :: config_use_surface_salinity_monthly_restoring, config_use_surface_temperature_monthly_restoring
       logical, pointer :: config_scale_dismf_by_removed_ice_runoff
       character (len=StrKIND), pointer :: config_restart_timestamp_name
       character (len=StrKIND), pointer :: config_sw_absorption_type
@@ -1193,11 +1203,14 @@ contains
            call mpas_timer_stop('io_CFC')
          endif
 
-         ! read next time level data required for monthly surface salinity restoring
+         ! read next time level data required for monthly surface salinity and temperature restoring
          call mpas_pool_get_config(domain % configs, 'config_use_activeTracers_surface_restoring',  &
                                                       config_use_activeTracers_surface_restoring)
          call mpas_pool_get_config(domain % configs, 'config_use_surface_salinity_monthly_restoring',  &
                                                       config_use_surface_salinity_monthly_restoring)
+         call mpas_pool_get_config(domain % configs, 'config_use_surface_temperature_monthly_restoring',  &
+                                                      config_use_surface_temperature_monthly_restoring)
+
          if (config_use_activeTracers_surface_restoring .and.  config_use_surface_salinity_monthly_restoring) then
              if ( mpas_is_alarm_ringing(domain % clock, 'salinityDataReadAlarm', ierr=ierr) ) then
                  call mpas_reset_clock_alarm(domain % clock, 'salinityDataReadAlarm', ierr=ierr)
@@ -1206,6 +1219,16 @@ contains
                  call mpas_timer_stop('io_monthly_surface_salinity')
              endif
          endif
+
+         if (config_use_activeTracers_surface_restoring .and.  config_use_surface_temperature_monthly_restoring) then
+             if ( mpas_is_alarm_ringing(domain % clock, 'temperatureDataReadAlarm', ierr=ierr) ) then
+                 call mpas_reset_clock_alarm(domain % clock, 'temperatureDataReadAlarm', ierr=ierr)
+                 call mpas_timer_start('io_monthly_surface_temperature',.false.)
+                 call ocn_get_surfaceTemperatureData(domain % streamManager, domain, domain_ptr % clock, .false.)
+                 call mpas_timer_stop('io_monthly_surface_temperature')
+             endif
+         endif
+
          if (iam==0.and.debugOn) then
             call mpas_log_write('   Finished reading forcing streams')
          endif
@@ -1307,6 +1330,9 @@ contains
 
          if (config_use_activeTracers_surface_restoring .and. config_use_surface_salinity_monthly_restoring)  &
              call ocn_salinity_restoring_forcing_write_restart(domain_ptr)
+         if (config_use_activeTracers_surface_restoring .and. config_use_surface_temperature_monthly_restoring)  &
+             call ocn_temperature_restoring_forcing_write_restart(domain_ptr)
+
          ! Write a restart file, because the coupler asked for it.
          if (debugOn) call mpas_log_write('Writing restart streams')
          call mpas_stream_mgr_begin_iteration(domain % streamManager)

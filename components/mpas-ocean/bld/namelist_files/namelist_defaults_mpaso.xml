@@ -733,6 +733,11 @@
 <config_salinity_restoring_constant_piston_velocity>1.585e-6</config_salinity_restoring_constant_piston_velocity>
 <config_salinity_restoring_max_difference>0.5</config_salinity_restoring_max_difference>
 <config_salinity_restoring_under_sea_ice>.false.</config_salinity_restoring_under_sea_ice>
+<config_use_surface_temperature_monthly_restoring>.false.</config_use_surface_temperature_monthly_restoring>
+<config_surface_temperature_monthly_restoring_compute_interval>'dt'</config_surface_temperature_monthly_restoring_compute_interval>
+<config_temperature_restoring_constant_piston_velocity>1.585e-6</config_temperature_restoring_constant_piston_velocity>
+<config_temperature_restoring_max_difference>0.5</config_temperature_restoring_max_difference>
+<config_temperature_restoring_under_sea_ice>.false.</config_temperature_restoring_under_sea_ice>
 
 <!-- tracer_forcing_debugTracers -->
 <config_use_debugTracers>.false.</config_use_debugTracers>

@@ -47,6 +47,26 @@
 			description="Flag to enable salinity restoring under sea ice.  The default setting is true, meaning that full salinity restoring is used everywhere, regardless of iceFraction value, except under ice shelves. If false, the salinity restoring tapers from full restoring in the open ocean (iceFraction=0.0) to zero restoring below full sea ice coverage (iceFraction=1.0); below partial sea ice coverage, restoring is in proportion to iceFraction."
 			possible_values=".true. or .false."
 		/>
+		<nml_option name="config_use_surface_temperature_monthly_restoring" type="logical" default_value=".false."
+			description="If true, apply monthly temperature restoring using a uniform piston velocity, defined at run-time by config_temperature_restoring_constant_piston_velocity.  When false, temperature piston velocity is specified in the input file by temperaturePistonVelocity, which may be spatially variable."
+			possible_values=".true. or .false."
+		/>
+		<nml_option name="config_surface_temperature_monthly_restoring_compute_interval" type="character" default_value="dt"
+			description="Time interval to compute temperature restoring tendency."
+			possible_values="Any valid time stamp e.g. format '0000-00-01_00:00:00' or 'dt'"
+		/>
+		<nml_option name="config_temperature_restoring_constant_piston_velocity" type="real" default_value="1.585e-5" units="m/year"
+			description="When config_use_surface_temperature_monthly_restoring is true, this flag provides a run-time override of the temperaturePistonVelocity variable in the input files.  It is uniform over the domain, and controls the rate at which temperature is restored to temperatureSurfaceRestoringValue"
+			possible_values="any non-negative number"
+		/>
+		<nml_option name="config_temperature_restoring_max_difference" type="real" default_value="100.0" units="1.e-3"
+			description="Maximum allowable difference between surface temperature and climatology, in grams salt per kilogram seawater."
+			possible_values="any non-negative number"
+		/>
+		<nml_option name="config_temperature_restoring_under_sea_ice" type="logical" default_value=".true."
+			description="Flag to enable temperature restoring under sea ice.  The default setting is true, meaning that full temperature restoring is used everywhere, regardless of iceFraction value, except under ice shelves. If false, the temperature restoring tapers from full restoring in the open ocean (iceFraction=0.0) to zero restoring below full sea ice coverage (iceFraction=1.0); below partial sea ice coverage, restoring is in proportion to iceFraction."
+			possible_values=".true. or .false."
+		/>
 	</nml_record>
 
 	<packages>
@@ -201,3 +221,9 @@
 			 description="monthly surface salinity climatology interpolated to current timestep"
 		/>
 	</var_struct>
+
+        <var_struct name="surfaceTemperatureMonthlyForcing" time_levs="1">
+                <var name="surfaceTemperatureMonthlyClimatologyValue" type="real" dimensions="nCells Time" array_group="activeGRP" units="1.e-3"
+                         description="monthly surface temperatureclimatology interpolated to current timestep"
+                />
+        </var_struct>

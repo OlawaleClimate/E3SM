@@ -2925,6 +2925,45 @@ Valid values: .true. or .false.
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_use_surface_temperature_monthly_restoring" type="logical"
+	category="tracer_forcing_activeTracers" group="tracer_forcing_activeTracers">
+If true, apply monthly temperature restoring using a uniform piston velocity, defined at run-time by config_temperature_restoring_constant_piston_velocity.  When false, temperature piston velocity is specified in the input file by temperaturePistonVelocity, which may be spatially variable.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_surface_temperature_monthly_restoring_compute_interval" type="char*1024"
+	category="tracer_forcing_activeTracers" group="tracer_forcing_activeTracers">
+Time interval to compute temperature restoring tendency.
+
+Valid values: Any valid time stamp e.g. format '0000-00-01_00:00:00' or 'dt'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_temperature_restoring_constant_piston_velocity" type="real"
+	category="tracer_forcing_activeTracers" group="tracer_forcing_activeTracers">
+When config_use_surface_temperature_monthly_restoring is true, this flag provides a run-time override of the temperaturePistonVelocity variable in the input files.  It is uniform over the domain, and controls the rate at which temperature is restored to temperatureSurfaceRestoringValue
+
+Valid values: any non-negative number
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_temperature_restoring_max_difference" type="real"
+	category="tracer_forcing_activeTracers" group="tracer_forcing_activeTracers">
+Maximum allowable difference between surface temperature and climatology, in grams salt per kilogram seawater.
+
+Valid values: any non-negative number
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_temperature_restoring_under_sea_ice" type="logical"
+	category="tracer_forcing_activeTracers" group="tracer_forcing_activeTracers">
+Flag to enable temperature restoring under sea ice.  The default setting is true, meaning that full temperature restoring is used everywhere, regardless of iceFraction value, except under ice shelves. If false, the temperature restoring tapers from full restoring in the open ocean (iceFraction=0.0) to zero restoring below full sea ice coverage (iceFraction=1.0); below partial sea ice coverage, restoring is in proportion to iceFraction.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
 
 <!-- tracer_forcing_debugTracers -->
 

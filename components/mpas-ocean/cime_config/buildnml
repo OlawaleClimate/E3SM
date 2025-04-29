@@ -726,6 +726,7 @@ def buildnml(case, caseroot, compname):
                 lines.append('')
                 lines.append('       <var name="xtime"/>')
                 lines.append('       <var name="surfaceSalinityMonthlyClimatologyValue"/>')
+                lines.append('       <var name="surfaceTemperatureMonthlyClimatologyValue"/>')
                 lines.append('</stream>')
                 lines.append('')
 

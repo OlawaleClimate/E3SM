@@ -378,6 +378,7 @@ module ocn_forward_mode
          call mpas_get_timeInterval(alarmTimeStep, timeString= &
                       config_surface_salinity_monthly_restoring_compute_interval, ierr=err_tmp)
       endif
+
       alarmTime = mpas_get_clock_time(domain % clock, MPAS_START_TIME, ierr=err_tmp)
 
       call mpas_set_timeInterval(alarmTimeStep, timeString= &
@@ -386,6 +387,24 @@ module ocn_forward_mode
       call mpas_add_clock_alarm(domain % clock, 'salinityDataReadAlarm', alarmTime, &
                 alarmTimeInterval=alarmTimeStep, ierr=err_tmp)
       call mpas_reset_clock_alarm(domain % clock, 'salinityDataReadAlarm', ierr=err_tmp)
+
+      endif
+
+      if (config_use_surface_temperature_monthly_restoring) then
+      !initialize the alarm for reading temperature data for restoring
+      if ( config_surface_temperature_monthly_restoring_compute_interval == 'dt') then
+         alarmTimeStep = mpas_get_clock_timestep(domain % clock, err_tmp)
+         call mpas_get_timeInterval(alarmTimeStep, timeString= &
+                      config_surface_temperature_monthly_restoring_compute_interval, ierr=err_tmp)
+      endif
+      alarmTime = mpas_get_clock_time(domain % clock, MPAS_START_TIME, ierr=err_tmp)
+
+      call mpas_set_timeInterval(alarmTimeStep, timeString= &
+              config_surface_temperature_monthly_restoring_compute_interval, ierr=err_tmp)
+
+      call mpas_add_clock_alarm(domain % clock, 'temperatureDataReadAlarm', alarmTime, &
+                alarmTimeInterval=alarmTimeStep, ierr=err_tmp)
+      call mpas_reset_clock_alarm(domain % clock, 'temperatureDataReadAlarm', ierr=err_tmp)
 
       endif
 
@@ -664,6 +683,14 @@ module ocn_forward_mode
         call mpas_timer_stop('io_monthly_surface_salinity')
       endif
 
+      ! read initial data required for monthly surface temperature restoring
+      ! always execute this call as initial data needed regardless of alarm
+      if (config_use_activeTracers_surface_restoring .and. config_use_surface_temperature_monthly_restoring) then
+        call mpas_timer_start('io_monthly_surface_temperature',.false.)
+        call ocn_get_surfaceTemperatureData(domain % streamManager, domain, domain % clock, .true.)
+        call mpas_timer_stop('io_monthly_surface_temperature')
+      endif
+
       ! initialize time-varying forcing
       call ocn_time_varying_forcing_init(domain)
 
@@ -787,7 +814,8 @@ module ocn_forward_mode
             ! write forcing restart if any type(s) time varying forcing is used
             if (trim(config_sw_absorption_type)=='ohlmann00' .or. &
                 config_use_ecosysTracers .or. &
-                (config_use_activeTracers_surface_restoring .and. config_use_surface_salinity_monthly_restoring) .or. &
+                (config_use_activeTracers_surface_restoring .and. (config_use_surface_salinity_monthly_restoring .or. &
+        config_use_surface_temperature_monthly_restoring)) .or. &
                 config_use_time_varying_atmospheric_forcing .or. &
                 config_use_time_varying_land_ice_forcing) then
 
@@ -837,6 +865,16 @@ module ocn_forward_mode
               call mpas_timer_start('io_monthly_surface_salinity',.false.)
               call ocn_get_surfaceSalinityData(domain % streamManager, domain, domain % clock, .false.)
               call mpas_timer_stop('io_monthly_surface_salinity')
+           endif
+         endif
+
+         ! read next time level data required for monthly surface temperature restoring
+         if (config_use_activeTracers_surface_restoring .and. config_use_surface_temperature_monthly_restoring) then
+           if ( mpas_is_alarm_ringing(domain % clock, 'temperatureDataReadAlarm', ierr=err_tmp) ) then
+              call mpas_reset_clock_alarm(domain % clock, 'temperatureDataReadAlarm', ierr=err_tmp)
+              call mpas_timer_start('io_monthly_surface_temperature',.false.)
+              call ocn_get_surfaceTemperatureData(domain % streamManager, domain, domain % clock, .false.)
+              call mpas_timer_stop('io_monthly_surface_temperature')
            endif
          endif
 

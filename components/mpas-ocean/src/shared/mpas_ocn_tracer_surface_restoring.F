@@ -52,7 +52,9 @@ module ocn_tracer_surface_restoring
 
    public :: ocn_tracer_surface_restoring_compute,          &
              ocn_get_surfaceSalinityData,                   &
+             ocn_get_surfaceTemperatureData,                &
              ocn_salinity_restoring_forcing_write_restart,  &
+             ocn_temperature_restoring_forcing_write_restart, &
              ocn_tracer_surface_restoring_init
 
    !--------------------------------------------------------------------
@@ -78,8 +80,9 @@ contains
 !-----------------------------------------------------------------------
 
    subroutine ocn_tracer_surface_restoring_compute(groupName, nTracers, nCells, masksTSRegion, tracers, pistonVelocity, &
-                 tracersSurfaceRestoringValue, tracersSurfaceFlux, indexSalinity,  &
-                 use_surface_salinity_monthly_restoring, salinity_restoring_constant_piston_velocity, err)!{{{
+                 tracersSurfaceRestoringValue, tracersSurfaceFlux, indexSalinity, indexTemperature,  &
+                 use_surface_salinity_monthly_restoring, salinity_restoring_constant_piston_velocity, &
+                 use_surface_temperature_monthly_restoring, temperature_restoring_constant_piston_velocity, err)!{{{
 
       !-----------------------------------------------------------------
       !
@@ -93,13 +96,14 @@ contains
       integer, intent(in) ::  &
           nTracers,           &
           indexSalinity,      &
+          indexTemperature,   &
           nCells
 
-      real (kind=RKIND), intent(in) :: salinity_restoring_constant_piston_velocity
+      real (kind=RKIND), intent(in) :: salinity_restoring_constant_piston_velocity, temperature_restoring_constant_piston_velocity
 
       ! logicals
       logical, intent(in) ::  &
-          use_surface_salinity_monthly_restoring
+          use_surface_salinity_monthly_restoring, use_surface_temperature_monthly_restoring
 
       ! three dimensional arrays
       real (kind=RKIND), dimension(:,:,:), intent(in) :: &
@@ -151,12 +155,26 @@ contains
                 !write(*,*) 'mask inside tracer', masksTSRegion(icell)
                 ! For monthly salinity restoring, tracersSurfaceRestoringValue contains the zero-mean deltaS
                 if (trim(groupName) == 'activeTracers' &
-                        .and. iTracer == indexSalinity   &
-                        .and. use_surface_salinity_monthly_restoring) then
+                        .and. (iTracer == indexSalinity .or. iTracer == indexTemperature)   &
+                        .and. (use_surface_salinity_monthly_restoring .or. use_surface_temperature_monthly_restoring)) then
                 tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) + &
                                                  salinity_restoring_constant_piston_velocity * &
                                                  tracersSurfaceRestoringValue(iTracer,iCell)
+!                write(*,*) 'mask inside tracer', masksTSRegion(icell)
+               write(*,*) 'inside temp monthly restoring', iTracer, tracersSurfaceRestoringValue(iTracer,iCell)
+
+
+                else if (trim(groupName) == 'activeTracers' &
+                        .and. (iTracer == indexSalinity .or. iTracer == indexTemperature)) then
+                tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) + &
+                                                 temperature_restoring_constant_piston_velocity * &
+                                                 tracersSurfaceRestoringValue(iTracer,iCell)
+                
+               write(*,*) 'inside temp normal restoring', iTracer, tracersSurfaceRestoringValue(iTracer,iCell)
+
                 else
+                        write(*,*) 'inside else restoring'
+
                 tracersSurfaceFlux(iTracer, iCell) =  tracersSurfaceFlux(iTracer, iCell) - &
                                                 pistonVelocity(iTracer,iCell) *      &
                                                  (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell))
@@ -495,6 +513,258 @@ contains
 
     end subroutine ocn_get_surfaceSalinityData!}}}
 
+
+!***********************************************************************
+
+!***********************************************************************
+!
+!  routine get_surfaceSalinityData
+!
+!> \brief   retrieve data needed to compute surface salinity restoring using
+!monthly climatology
+!> \author  Olawale Ikuyajolu
+!> \date    04/25/25
+!> \details
+!>  This routine calls mpas_forcing routines to acquire needed surface temperature
+!forcing data and interpolates
+!>    between time levels.
+!
+!-----------------------------------------------------------------------
+
+
+    subroutine ocn_get_surfaceTemperatureData( streamManager, &
+        domain, &
+        simulationClock, &
+        firstTimeStep) !{{{
+
+
+        type (MPAS_streamManager_type), intent(inout) :: streamManager
+
+        type (domain_type) :: domain
+        type (MPAS_timeInterval_type) :: timeStepSurfaceTemperature
+        type (MPAS_clock_type) :: simulationClock
+
+        type (MPAS_Time_Type) :: currTime
+        character(len=strKind) :: timeStamp
+
+        logical, intent(in) :: firstTimeStep
+        real(kind=RKIND) :: dt,deltaT
+        type (block_type), pointer :: block
+
+
+        type (dm_info) :: dminfo
+
+        type (mpas_pool_type), pointer :: forcingPool
+        type (mpas_pool_type), pointer :: meshPool
+        type (mpas_pool_type), pointer :: statePool
+        type (mpas_pool_type), pointer :: tracersPool
+        type (mpas_pool_type), pointer :: surfaceTemperatureMonthlyForcing
+        type (mpas_pool_type), pointer :: tracersSurfaceRestoringFieldsPool
+
+        real (kind=RKIND), dimension(:), pointer :: &
+           surfaceTemperatureMonthlyClimatologyValue, iceFraction, areaCell
+
+        real (kind=RKIND), dimension(:,:), pointer :: &
+           activeTracersSurfaceRestoringValue
+
+        real (kind=RKIND), dimension(:,:,:), pointer :: activeTracers
+
+        integer, pointer :: nCells, nCellsSolve
+        integer,pointer :: indexTemperaturePtr, indexTemperatureSurfaceRestoringPtr
+        integer         :: indexTemperature, indexTemperatureSurfaceRestoringValue
+        integer         :: iCell, timeLevel
+        integer,dimension(:),pointer :: landIceMask
+
+        character(len=strKIND) :: &
+           forcingIntervalMonthly,  &
+           forcingReferenceTimeMonthly
+
+        integer :: ierr
+
+
+
+        ! initialize monthly forcing to be read from file
+
+
+        if (firstTimeStep) then
+
+           currTime = mpas_get_clock_time( simulationClock, MPAS_NOW, ierr)
+           call mpas_get_time(curr_time=currTime, dateTimeString=timeStamp, ierr=ierr)
+           timeStamp = '0000'//trim(timeStamp(5:))
+
+           forcingIntervalMonthly = "0000-01-00_00:00:00"
+           forcingReferenceTimeMonthly = "0000-01-15_00:00:00"
+
+           call MPAS_forcing_init_group( forcingGroupHead,  &
+                "surfaceSalinityMonthlyClimatology", &
+                domain, &
+                timeStamp, &
+                '0000-01-01_00:00:00', &
+                '0001-00-00_00:00:00', &
+                config_do_restart)
+
+
+           call MPAS_forcing_init_field( domain%streamManager,            &
+                forcingGroupHead,                        &
+                'surfaceTemperatureMonthlyClimatology',  & !  forcing group name
+                'surfaceTemperatureMonthlyClimatologyValue',& !  array name
+                'surface_salinity_monthly_data',        & !  stream name
+                'surfaceTemperatureMonthlyForcing',        & !  pool name
+                'surfaceTemperatureMonthlyClimatologyValue', & !  array name
+                'linear',                                              &
+                forcingReferenceTimeMonthly,  &
+                forcingIntervalMonthly)
+
+           call MPAS_forcing_init_field_data( forcingGroupHead, &
+                'surfaceTemperatureMonthlyClimatology', &
+                domain % streamManager, &
+                config_do_restart, &
+                .false.)
+
+           return
+        endif  !  first timestep
+
+
+
+        call MPAS_set_timeInterval(timeStepSurfaceTemperature,timeString=config_surface_temperature_monthly_restoring_compute_interval)
+        call MPAS_get_timeInterval(timeStepSurfaceTemperature, dt=dt)
+
+        call mpas_pool_get_subpool(domain % blocklist % structs,'surfaceTemperatureMonthlyForcing',  &
+                                                             surfaceTemperatureMonthlyForcing)
+        call mpas_pool_get_array(surfaceTemperatureMonthlyForcing, 'surfaceTemperatureMonthlyClimatologyValue',  &
+                                                                    surfaceTemperatureMonthlyClimatologyValue)
+
+        call MPAS_forcing_get_forcing(forcingGroupHead,    &
+            'surfaceTemperatureMonthlyClimatology', streamManager, dt)
+
+
+      block => domain % blocklist
+      do while (associated(block))
+
+        call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
+        call mpas_pool_get_subpool(block % structs, 'forcing', forcingPool)
+        call mpas_pool_get_subpool(block % structs, 'state', statePool)
+        call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
+        call mpas_pool_get_subpool(forcingPool, 'tracersSurfaceRestoringFields',tracersSurfaceRestoringFieldsPool)
+        ! Use time level 1, which is always the new time level
+        timeLevel = 1
+        call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, timeLevel)
+
+        call mpas_pool_get_dimension(block % dimensions, 'nCells', nCells)
+        call mpas_pool_get_dimension(block % dimensions, 'nCellsSolve', nCellsSolve)
+        call mpas_pool_get_dimension(tracersPool, 'index_temperature', &
+                                                   indexTemperaturePtr)
+
+         call mpas_pool_get_dimension(tracersSurfaceRestoringFieldsPool, &
+                                'index_temperatureSurfaceRestoringValue',&
+                                 indexTemperatureSurfaceRestoringPtr)
+
+         indexTemperature                 = indexTemperaturePtr
+         indexTemperatureSurfaceRestoringValue = &
+                                            indexTemperatureSurfaceRestoringPtr
+
+         call mpas_pool_get_subpool(block % structs, 'surfaceTemperatureMonthlyForcing', &
+                                                        surfaceTemperatureMonthlyForcing)
+         call mpas_pool_get_array(surfaceTemperatureMonthlyForcing, 'surfaceTemperatureMonthlyClimatologyValue', &
+                                                                     surfaceTemperatureMonthlyClimatologyValue)
+
+        call mpas_pool_get_array(tracersSurfaceRestoringFieldsPool, 'activeTracersSurfaceRestoringValue', &
+           activeTracersSurfaceRestoringValue)
+
+        call mpas_pool_get_array(forcingPool, 'iceFraction', iceFraction)
+        call mpas_pool_get_array(forcingPool, 'landIceMask', landIceMask)
+        call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
+
+
+        ! This is not in a threaded region, so no openMP pragmas are needed.
+        if ( associated(landIceMask)) then
+
+          if (config_temperature_restoring_under_sea_ice) then
+
+            ! Simulation has landIceMask AND
+            ! config_temperature_restoring_under_sea_ice=.true. (default)
+            do iCell = 1, nCells
+              if (landIceMask(iCell)==1) then
+                ! Turn off temperature restoring in this cell
+                activeTracersSurfaceRestoringValue(indexTemperatureSurfaceRestoringValue,iCell) = 0.0_RKIND
+              else
+                ! Turn on temperature restoring in this cell
+                deltaT = surfaceTemperatureMonthlyClimatologyValue(iCell)! - activeTracers(indexTemperature,1,iCell)
+                if (deltaT >  config_temperature_restoring_max_difference) deltaT =  config_temperature_restoring_max_difference
+                if (deltaT < -config_temperature_restoring_max_difference) deltaT = -config_temperature_restoring_max_difference
+
+                ! temperature restoring below sea ice is always on, regardless
+                ! of iceFraction value
+                activeTracersSurfaceRestoringValue(indexTemperatureSurfaceRestoringValue,iCell) = deltaT
+              endif
+            end do
+
+          else ! config_temperature_restoring_under_sea_ice = .false.
+
+            ! Simulation has landIceMask AND
+            ! config_temperature_restoring_under_sea_ice=.false.
+            do iCell = 1, nCells
+              if (landIceMask(iCell)==1) then
+                ! Turn off temperature restoring in this cell
+                activeTracersSurfaceRestoringValue(indexTemperatureSurfaceRestoringValue,iCell) = 0.0_RKIND
+              else
+                ! Turn on temperature restoring in this cell
+                deltaT = surfaceTemperatureMonthlyClimatologyValue(iCell)! - activeTracers(indexTemperature,1,iCell)
+                if (deltaT >  config_temperature_restoring_max_difference) deltaT =  config_temperature_restoring_max_difference
+                if (deltaT < -config_temperature_restoring_max_difference) deltaT = -config_temperature_restoring_max_difference
+
+                ! temperature restoring below sea ice tapers below partial sea
+                ! ice
+                ! coverage, from full in the open ocean to zero when
+                ! iceFraction=1.0
+                activeTracersSurfaceRestoringValue(indexTemperatureSurfaceRestoringValue,iCell) = &
+                   deltaT*(1.0_RKIND - iceFraction(iCell))
+              endif
+            end do
+
+          endif
+
+        else  ! associated(landIceMask)) = .false.
+
+          if (config_temperature_restoring_under_sea_ice) then
+
+            ! Simulation has NO landIceMask AND
+            ! config_temperature_restoring_under_sea_ice=.true. (default)
+            do iCell = 1, nCells
+              deltaT = surfaceTemperatureMonthlyClimatologyValue(iCell) !- activeTracers(indexTemperature,1,iCell)
+              if (deltaT >  config_temperature_restoring_max_difference) deltaT =  config_temperature_restoring_max_difference
+              if (deltaT < -config_temperature_restoring_max_difference) deltaT = -config_temperature_restoring_max_difference
+
+              ! Temperature restoring below sea ice is always on, regardless of
+              ! iceFraction value
+              activeTracersSurfaceRestoringValue(indexTemperatureSurfaceRestoringValue,iCell) = deltaT
+            end do
+
+          else ! config_temperature_restoring_under_sea_ice = .false.
+
+            ! Simulation has NO landIceMask AND
+            ! config_temperature_restoring_under_sea_ice=.false.
+            do iCell = 1, nCells
+              deltaT = surfaceTemperatureMonthlyClimatologyValue(iCell) !- activeTracers(indexTemperature,1,iCell)
+              if (deltaT >  config_temperature_restoring_max_difference) deltaT =  config_temperature_restoring_max_difference
+              if (deltaT < -config_temperature_restoring_max_difference) deltaT = -config_temperature_restoring_max_difference
+
+              ! Temperature restoring below sea ice tapers below partial sea ice
+              ! coverage, from full in the open ocean to zero when
+              ! iceFraction=1.0
+              activeTracersSurfaceRestoringValue(indexTemperatureSurfaceRestoringValue,iCell) = &
+                 deltaT*(1.0_RKIND - iceFraction(iCell))
+            end do
+
+          endif
+
+        endif
+
+        block => block % next
+      end do
+
+    end subroutine ocn_get_surfaceTemperatureData!}}}
+
 !***********************************************************************
 !
 !  routine ocn_salinity_restoring_forcing_write_restart
@@ -515,6 +785,31 @@ contains
     end subroutine ocn_salinity_restoring_forcing_write_restart!}}}
 
 !***********************************************************************
+
+
+!***********************************************************************
+!
+!  routine ocn_temperature_restoring_forcing_write_restart
+!
+!> \brief   writes restart timestamp for temperature restoring data to be read in
+!on future restart
+!> \author  Olawale Ikuyajolu
+!> \date    04/25/2025
+
+!
+!-----------------------------------------------------------------------
+
+   subroutine ocn_temperature_restoring_forcing_write_restart(domain)!{{{
+
+      type(domain_type) :: domain
+
+      call MPAS_forcing_write_restart_times(forcingGroupHead)
+
+    end subroutine ocn_temperature_restoring_forcing_write_restart!}}}
+
+!***********************************************************************
+
+
 
 end module ocn_tracer_surface_restoring
 

@@ -1073,10 +1073,13 @@ contains
                    nTracersGroup, nCellsAll, nMasksTSRegion, tracerGroup,  &
                    tracerGroupPistonVelocity, &
                    tracerGroupSurfaceRestoringValue, &
-                   tracerGroupSurfaceFlux, indxSalt, &
+                   tracerGroupSurfaceFlux, indxSalt, indxTemp, &
                    config_use_surface_salinity_monthly_restoring, &
                    config_salinity_restoring_constant_piston_velocity, &
+                   config_use_surface_temperature_monthly_restoring, &
+                   config_temperature_restoring_constant_piston_velocity, &
                    err)
+
             call mpas_timer_stop("surface_restoring_"//groupName)
 
          endif ! sfc restoring
