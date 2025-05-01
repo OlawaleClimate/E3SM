@@ -155,29 +155,34 @@ contains
                 !write(*,*) 'mask inside tracer', masksTSRegion(icell)
                 ! For monthly salinity restoring, tracersSurfaceRestoringValue contains the zero-mean deltaS
                 if (trim(groupName) == 'activeTracers' &
-                        .and. (iTracer == indexSalinity .or. iTracer == indexTemperature)   &
-                        .and. (use_surface_salinity_monthly_restoring .or. use_surface_temperature_monthly_restoring)) then
+                        .and. iTracer == indexTemperature   &
+                        .and. use_surface_temperature_monthly_restoring) then
+
+                   write(*,*) 'before', tracersSurfaceFlux(iTracer, iCell)
+
                 tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) + &
                                                  salinity_restoring_constant_piston_velocity * &
                                                  tracersSurfaceRestoringValue(iTracer,iCell)
 !                write(*,*) 'mask inside tracer', masksTSRegion(icell)
-               write(*,*) 'inside temp monthly restoring', iTracer, tracersSurfaceRestoringValue(iTracer,iCell)
-
-
-                else if (trim(groupName) == 'activeTracers' &
-                        .and. (iTracer == indexSalinity .or. iTracer == indexTemperature)) then
-                tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) + &
-                                                 temperature_restoring_constant_piston_velocity * &
-                                                 tracersSurfaceRestoringValue(iTracer,iCell)
-                
-               write(*,*) 'inside temp normal restoring', iTracer, tracersSurfaceRestoringValue(iTracer,iCell)
-
+               write(*,*) 'inside temp monthly restoring', tracersSurfaceRestoringValue(iTracer,iCell), temperature_restoring_constant_piston_velocity
+               write(*,*) 'after', tracersSurfaceFlux(iTracer, iCell)
+           
                 else
-                        write(*,*) 'inside else restoring'
+                        
+                         if (iTracer == indexTemperature) then
+
+                        write(*,*) 'before sal_only', tracersSurfaceRestoringValue(iTracer,iCell), tracersSurfaceFlux(iTracer, iCell)
+                        write(*,*) 'pistonVelocity', pistonVelocity(iTracer,iCell), temperature_restoring_constant_piston_velocity 
+                        end if
 
                 tracersSurfaceFlux(iTracer, iCell) =  tracersSurfaceFlux(iTracer, iCell) - &
                                                 pistonVelocity(iTracer,iCell) *      &
                                                  (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell))
+                        if (iTracer == indexTemperature) then
+
+                        write(*,*) ' afta sal_only', tracersSurfaceRestoringValue(iTracer,iCell), tracersSurfaceFlux(iTracer, iCell)
+
+                        end if
                 endif
           endif
         enddo
