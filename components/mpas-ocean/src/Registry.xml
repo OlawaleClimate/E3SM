@@ -2803,7 +2803,7 @@
 			 description="Pre-computed wet fraction for each edge at given ssh value"
 			 packages="subgridWetDryPKG"
 		/>
-                <var name="masksTSRegion" type="real" dimensions="nCells"
+                <var name="masksTSRegion" type="integer" dimensions="nCells"
                          description="Region mask for restoring temperature and/or salinity. 1 in the region, 0 elsewhere."
                 />
 	</var_struct>
@@ -2862,7 +2862,11 @@
 	 	/>
 		<var name="salinitySurfaceRestoringTendency" type="real" dimensions="nCells Time" units="m 1.e-3 s^-1" packages="activeTracersSurfaceRestoringPKG"
 			 description="salinity tendency due to surface restoring"
-		/>
+		 />
+                <var name="temperatureSurfaceRestoringTendency" type="real" dimensions="nCells Time" units="m 1.e-3 s^-1" packages="activeTracersSurfaceRestoringPKG"
+                         description="temperature tendency due to surface restoring"
+                />
+
 		<var_array name="activeTracerSurfaceFluxTendency" type="real" dimensions="nVertLevels nCells Time" packages="tracerBudget">
 
 			<var name="temperatureSurfaceFluxTendency" array_group="activeTracerSfcFluxTendGroup" units="C s^-1" name_in_code="temperatureSurfaceFluxTendency"

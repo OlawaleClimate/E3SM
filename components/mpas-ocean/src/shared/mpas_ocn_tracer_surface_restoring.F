@@ -115,7 +115,7 @@ contains
          tracersSurfaceRestoringValue
 
       ! one dimensional arrays
-      real (kind=RKIND), dimension(:), intent(inout) :: &
+      integer, dimension(:), intent(inout) :: &
           masksTSRegion
       !-----------------------------------------------------------------
       !
@@ -140,9 +140,11 @@ contains
       !
       !-----------------------------------------------------------------
 
-      integer :: iCell, iLevel, iTracer
+      integer :: iCell, iLevel, iTracer, mask_num
 
       err = 0
+
+      mask_num = 0
 
       !$omp parallel
       !$omp do schedule(runtime) private(iTracer, iLevel)
@@ -155,34 +157,29 @@ contains
                 !write(*,*) 'mask inside tracer', masksTSRegion(icell)
                 ! For monthly salinity restoring, tracersSurfaceRestoringValue contains the zero-mean deltaS
                 if (trim(groupName) == 'activeTracers' &
-                        .and. iTracer == indexTemperature   &
-                        .and. use_surface_temperature_monthly_restoring) then
-
-                   write(*,*) 'before', tracersSurfaceFlux(iTracer, iCell)
+                        .and. iTracer == indexSalinity   &
+                        .and. use_surface_salinity_monthly_restoring) then
 
                 tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) + &
                                                  salinity_restoring_constant_piston_velocity * &
                                                  tracersSurfaceRestoringValue(iTracer,iCell)
-!                write(*,*) 'mask inside tracer', masksTSRegion(icell)
-               write(*,*) 'inside temp monthly restoring', tracersSurfaceRestoringValue(iTracer,iCell), temperature_restoring_constant_piston_velocity
-               write(*,*) 'after', tracersSurfaceFlux(iTracer, iCell)
-           
-                else
+                !write(*,*) 'inside Salinity', tracersSurfaceRestoringValue(iTracer,iCell)
+                else if (trim(groupName) == 'activeTracers' &
+                        .and. iTracer == indexTemperature   &
+                        .and. use_surface_temperature_monthly_restoring) then
                         
-                         if (iTracer == indexTemperature) then
-
-                        write(*,*) 'before sal_only', tracersSurfaceRestoringValue(iTracer,iCell), tracersSurfaceFlux(iTracer, iCell)
-                        write(*,*) 'pistonVelocity', pistonVelocity(iTracer,iCell), temperature_restoring_constant_piston_velocity 
-                        end if
+                tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) - &
+                                                 temperature_restoring_constant_piston_velocity * &
+                                                 (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell)) 
+                !mask_num = mask_num+masksTSRegion(icell) 
+                !`write(*,*) tracersSurfaceRestoringValue(iTracer,iCell), tracers(iTracer, iLevel, iCell)
+                !write(*,*) 'inside Temp', tracersSurfaceRestoringValue(iTracer,iCell), temperature_restoring_constant_piston_velocity * (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell))
+                else
 
                 tracersSurfaceFlux(iTracer, iCell) =  tracersSurfaceFlux(iTracer, iCell) - &
                                                 pistonVelocity(iTracer,iCell) *      &
                                                  (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell))
-                        if (iTracer == indexTemperature) then
 
-                        write(*,*) ' afta sal_only', tracersSurfaceRestoringValue(iTracer,iCell), tracersSurfaceFlux(iTracer, iCell)
-
-                        end if
                 endif
           endif
         enddo
@@ -601,7 +598,7 @@ contains
            forcingReferenceTimeMonthly = "0000-01-15_00:00:00"
 
            call MPAS_forcing_init_group( forcingGroupHead,  &
-                "surfaceSalinityMonthlyClimatology", &
+                "surfaceTemperatureMonthlyClimatology", &
                 domain, &
                 timeStamp, &
                 '0000-01-01_00:00:00', &
@@ -764,6 +761,18 @@ contains
           endif
 
         endif
+
+
+        do iCell = 1, nCells
+          deltaT = activeTracersSurfaceRestoringValue(indexTemperatureSurfaceRestoringValue,iCell)
+          if (deltaT .ne. 0.0_RKIND) then
+             temperatureSurfaceRestoringTendency(iCell) = &
+                (activeTracers(indexTemperature,1,iCell) - activeTracersSurfaceRestoringValue(indexTemperatureSurfaceRestoringValue,iCell)) &
+                * config_temperature_restoring_constant_piston_velocity
+          else
+             temperatureSurfaceRestoringTendency(iCell) = 0.0_RKIND
+          endif
+        enddo
 
         block => block % next
       end do

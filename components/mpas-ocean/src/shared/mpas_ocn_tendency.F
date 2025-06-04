@@ -633,7 +633,7 @@ contains
          penetrativeTemperatureFlux, &! heat flux penetrating below sfc
          tracerGroupExponentialDecayRate ! exp decay rate for forcing
       
-      real (kind=RKIND), dimension(:), pointer :: &
+      integer, dimension(:), pointer :: &
          nMasksTSRegion                !mask for TS restoring region
 
       real (kind=RKIND), dimension(:,:), pointer, contiguous :: &
@@ -1065,7 +1065,7 @@ contains
             call mpas_pool_get_array(meshPool, "masksTSRegion", &
                               nMasksTSRegion)
             !call mpas_log_write( 'new MasksTS max = $i', intArgs=(/size(nMasksTSRegion)/))
-            !write(*,*) 'max MasksTS', maxval(nMasksTSRegion)
+            !write(*,*) 'sum MasksTS', sum(nMasksTSRegion)
 
             ! Note: monthly surface salinity restoring is a special
             ! case for tracer restoring

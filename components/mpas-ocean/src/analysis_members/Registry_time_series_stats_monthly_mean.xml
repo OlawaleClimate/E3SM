@@ -168,6 +168,7 @@
 			<var name="bottomLayerShortwaveTemperatureFlux"/>
 			<var_array name="activeTracersTend"/>
 			<var name="salinitySurfaceRestoringTendency"/>
+			<var name="temperatureSurfaceRestoringTendency"/>
 			<var_array name="activeTracerHorizontalAdvectionTendency"/>
 			<var_array name="activeTracerVerticalAdvectionTendency"/>
 			<var_array name="activeTracerVertMixTendency"/>

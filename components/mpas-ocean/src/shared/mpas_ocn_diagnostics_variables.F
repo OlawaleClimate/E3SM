@@ -188,7 +188,7 @@ module ocn_diagnostics_variables
    real (kind=RKIND), dimension(:), pointer :: indexBoundaryLayerDepth
    integer :: index_vertNonLocalFluxTemp
 
-   real (kind=RKIND), dimension(:), pointer :: salinitySurfaceRestoringTendency
+   real (kind=RKIND), dimension(:), pointer :: salinitySurfaceRestoringTendency, temperatureSurfaceRestoringTendency
 
    real (kind=RKIND), dimension(:,:), pointer :: surfaceVelocity
    real (kind=RKIND), dimension(:), pointer :: gradSSHZonal, gradSSHMeridional
@@ -350,6 +350,9 @@ contains
          call mpas_pool_get_array(diagnosticsPool, &
                   'salinitySurfaceRestoringTendency', &
                    salinitySurfaceRestoringTendency)
+         call mpas_pool_get_array(diagnosticsPool, &
+                  'temperatureSurfaceRestoringTendency', &
+                   temperatureSurfaceRestoringTendency)           
       end if
 
       ! Retrieve pointers for configurations where land_ice_flux_mode is enabled
@@ -1368,6 +1371,7 @@ contains
       end if
       if ( config_use_activeTracers_surface_restoring ) then
          nullify(salinitySurfaceRestoringTendency)
+         nullify(temperatureSurfaceRestoringTendency)
       end if
       if ( config_use_self_attraction_loading ) then
          nullify(pgf_sal)
