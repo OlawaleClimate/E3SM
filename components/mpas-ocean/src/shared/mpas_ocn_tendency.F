@@ -636,6 +636,10 @@ contains
       integer, dimension(:), pointer :: &
          nMasksTSRegion                !mask for TS restoring region
 
+
+      real (kind=RKIND), dimension(:), pointer :: &
+         nMasksPistonSalt, nMasksPistonTemp                !spatial piston velocity for TS restoring region
+
       real (kind=RKIND), dimension(:,:), pointer, contiguous :: &
          tracerGroupPistonVelocity,        &! forcing piston velocity
          tracerGroupSurfaceRestoringValue, &! restore sfc to this value
@@ -1064,13 +1068,19 @@ contains
 
             call mpas_pool_get_array(meshPool, "masksTSRegion", &
                               nMasksTSRegion)
+ 
+            call mpas_pool_get_array(meshPool, "masksPistonSalt", &
+                              nMasksPistonSalt)
+            call mpas_pool_get_array(meshPool, "masksPistonTemp", &
+                              nMasksPistonTemp)
+
             !call mpas_log_write( 'new MasksTS max = $i', intArgs=(/size(nMasksTSRegion)/))
             !write(*,*) 'sum MasksTS', sum(nMasksTSRegion)
 
             ! Note: monthly surface salinity restoring is a special
             ! case for tracer restoring
             call ocn_tracer_surface_restoring_compute(groupName, &
-                   nTracersGroup, nCellsAll, nMasksTSRegion, tracerGroup,  &
+                   nTracersGroup, nCellsAll, nMasksTSRegion,nMasksPistonSalt, nMasksPistonTemp, tracerGroup,  &
                    tracerGroupPistonVelocity, &
                    tracerGroupSurfaceRestoringValue, &
                    tracerGroupSurfaceFlux, indxSalt, indxTemp, &

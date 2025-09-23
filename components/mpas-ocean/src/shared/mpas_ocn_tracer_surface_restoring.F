@@ -79,7 +79,7 @@ contains
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_tracer_surface_restoring_compute(groupName, nTracers, nCells, masksTSRegion, tracers, pistonVelocity, &
+   subroutine ocn_tracer_surface_restoring_compute(groupName, nTracers, nCells, masksTSRegion, masksPistonSalt, masksPistonTemp, tracers, pistonVelocity, &
                  tracersSurfaceRestoringValue, tracersSurfaceFlux, indexSalinity, indexTemperature,  &
                  use_surface_salinity_monthly_restoring, salinity_restoring_constant_piston_velocity, &
                  use_surface_temperature_monthly_restoring, temperature_restoring_constant_piston_velocity, err)!{{{
@@ -117,6 +117,8 @@ contains
       ! one dimensional arrays
       integer, dimension(:), intent(inout) :: &
           masksTSRegion
+      real (kind=RKIND), dimension(:), intent(inout) :: &
+              masksPistonSalt, masksPistonTemp
       !-----------------------------------------------------------------
       !
       ! input/output variables
@@ -153,15 +155,14 @@ contains
 
         do iTracer=1,nTracers
 
-!          if (masksTSRegion(icell) == 1) then
-                !write(*,*) 'mask inside tracer', masksTSRegion(icell)
                 ! For monthly salinity restoring, tracersSurfaceRestoringValue contains the zero-mean deltaS
                 if (trim(groupName) == 'activeTracers' &
                         .and. iTracer == indexSalinity   &
                         .and. use_surface_salinity_monthly_restoring) then
 
                 tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) + &
-                                                 salinity_restoring_constant_piston_velocity * &
+                                                 !salinity_restoring_constant_piston_velocity * &
+                                                 masksPistonSalt(iCell) * &
                                                  tracersSurfaceRestoringValue(iTracer,iCell)
                 !write(*,*) 'inside Salinity', tracersSurfaceRestoringValue(iTracer,iCell)
                 else if (trim(groupName) == 'activeTracers' &
@@ -169,9 +170,9 @@ contains
                         .and. use_surface_temperature_monthly_restoring) then
                         
                 tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) - &
-                                                 temperature_restoring_constant_piston_velocity * &
+                                                 !temperature_restoring_constant_piston_velocity * &
+                                                 masksPistonTemp(iCell) * &
                                                  (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell)) 
-                !mask_num = mask_num+masksTSRegion(icell) 
                 !`write(*,*) tracersSurfaceRestoringValue(iTracer,iCell), tracers(iTracer, iLevel, iCell)
                 !write(*,*) 'inside Temp', tracersSurfaceRestoringValue(iTracer,iCell), temperature_restoring_constant_piston_velocity * (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell))
                 else
@@ -181,7 +182,6 @@ contains
                                                  (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell))
 
                 endif
- !               endif
         enddo
       enddo
       !$omp end do

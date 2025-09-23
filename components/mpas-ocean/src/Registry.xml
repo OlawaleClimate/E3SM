@@ -1802,7 +1802,8 @@
 			<var name="bed_elevation"/>
 			<var name="LTSRegion"/>
                         <var name="masksTSRegion"/>
-
+                        <var name="masksPistonSalt"/>
+                        <var name="masksPistonTemp"/>
 		</stream>
 
 		<stream name="output_init"
@@ -1925,7 +1926,9 @@
 			<var name="maxLevelCell"/>
 			<var name="refBottomDepth" packages="forwardMode;analysisMode"/>
 			<var name="restingThickness" packages="forwardMode;analysisMode"/>
-                        <var name="masksTSRegion"/>
+			<var name="masksTSRegion"/>
+                        <var name="masksPistonSalt"/>
+                        <var name="masksPistonTemp"/>
 
 		</stream>
 
@@ -2805,6 +2808,12 @@
 		/>
                 <var name="masksTSRegion" type="integer" dimensions="nCells"
                          description="Region mask for restoring temperature and/or salinity. 1 in the region, 0 elsewhere."
+		 />
+                <var name="masksPistonSalt" type="real" dimensions="nCells"
+                         description="Spatially varying Piston Velocity for Salinity"
+                />
+                <var name="masksPistonTemp" type="real" dimensions="nCells"
+                         description="Spatially varying Piston Velocity for Temp"
                 />
 	</var_struct>
 	<var_struct name="verticalMesh" time_levs="1">
