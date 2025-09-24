@@ -161,8 +161,8 @@ contains
                         .and. use_surface_salinity_monthly_restoring) then
 
                 tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) + &
-                                                 !salinity_restoring_constant_piston_velocity * &
-                                                 masksPistonSalt(iCell) * &
+                                                 salinity_restoring_constant_piston_velocity * &
+                                                 !masksPistonSalt(iCell) * &
                                                  tracersSurfaceRestoringValue(iTracer,iCell)
                 !write(*,*) 'inside Salinity', tracersSurfaceRestoringValue(iTracer,iCell)
                 else if (trim(groupName) == 'activeTracers' &
@@ -170,8 +170,8 @@ contains
                         .and. use_surface_temperature_monthly_restoring) then
                         
                 tracersSurfaceFlux(iTracer, iCell) =   tracersSurfaceFlux(iTracer, iCell) - &
-                                                 !temperature_restoring_constant_piston_velocity * &
-                                                 masksPistonTemp(iCell) * &
+                                                 temperature_restoring_constant_piston_velocity * &
+                                                 !masksPistonTemp(iCell) * &
                                                  (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell)) 
                 !`write(*,*) tracersSurfaceRestoringValue(iTracer,iCell), tracers(iTracer, iLevel, iCell)
                 !write(*,*) 'inside Temp', tracersSurfaceRestoringValue(iTracer,iCell), temperature_restoring_constant_piston_velocity * (tracers(iTracer, iLevel, iCell) - tracersSurfaceRestoringValue(iTracer,iCell))
@@ -450,12 +450,70 @@ contains
 
         endif
 
+      ! For reproducible sums like mpas_global_sum_mod(), the range must be specified in min/max pairs for each array dimension. 
+      ! In this case, the array is getting packed in advance so the min is always 1 but the max can vary. 
+      ! Both need to be provided for the interface.
+        indexForReproSum(1) = 1
+        indexForReproSum(2) = 0
+        do iCell=1,nCellsSolve
+           deltaS = activeTracersSurfaceRestoringValue(indexSalinitySurfaceRestoringValue,iCell)
+           if (deltaS .ne. 0.0_RKIND) then
+              indexForReproSum(2) = indexForReproSum(2) + 1
+              localArrayForReproSum(indexForReproSum(2),1) = deltaS
+              localArrayForReproSum(indexForReproSum(2),2) = areaCell(iCell)
+           endif
+        enddo
+
         block => block % next
       end do
 
+      ! Global sum to subtract global mean of deltaS
+      dminfo = domain % dminfo
+! first do 1 field sum for area
+      reductions(1) = mpas_global_sum(localArrayForReproSum(:,2), &
+                                           domain%dminfo%comm, indexForReproSum)
+! now do sum of 2 mupltiplied fields for area*deltaS
+      reductions(2) = mpas_global_sum(localArrayForReproSum(:,1), localArrayForReproSum(:,2), &
+                                           domain%dminfo%comm, indexForReproSum)
+
+      sumAreaDeltaSGlobal = reductions(2)
+      sumAreaGlobal       = reductions(1)
+      avgDeltaS = sumAreaDeltaSGlobal/(sumAreaGlobal + 1.e-20_RKIND)
+
+      deallocate (localArrayForReproSum)
+
+      block => domain % blocklist
+      do while (associated(block))
+
+        call mpas_pool_get_dimension(block % dimensions, 'nCells', nCells)
+        call mpas_pool_get_subpool(block % structs, 'forcing', forcingPool)
+        call mpas_pool_get_array(forcingPool, 'iceFraction', iceFraction)
+        call mpas_pool_get_subpool(forcingPool, 'tracersSurfaceRestoringFields',tracersSurfaceRestoringFieldsPool)
+        call mpas_pool_get_array(tracersSurfaceRestoringFieldsPool, 'activeTracersSurfaceRestoringValue', &
+           activeTracersSurfaceRestoringValue)
+        call mpas_pool_get_dimension(tracersSurfaceRestoringFieldsPool, &
+                                'index_salinitySurfaceRestoringValue',  &
+                                 indexSalinitySurfaceRestoringValuePtr)
+        indexSalinitySurfaceRestoringValue = &
+                                 indexSalinitySurfaceRestoringValuePtr
+
+        do iCell = 1, nCells
+          deltaS = activeTracersSurfaceRestoringValue(indexSalinitySurfaceRestoringValue,iCell)
+          if (deltaS .ne. 0.0_RKIND) then
+             activeTracersSurfaceRestoringValue(indexSalinitySurfaceRestoringValue,iCell) =  &
+                deltaS - avgDeltaS
+             salinitySurfaceRestoringTendency(iCell) = &
+                activeTracersSurfaceRestoringValue(indexSalinitySurfaceRestoringValue,iCell) &
+                * config_salinity_restoring_constant_piston_velocity
+          else
+             salinitySurfaceRestoringTendency(iCell) = 0.0_RKIND
+          endif
+        enddo
+
+        block => block % next
+      end do
 
     end subroutine ocn_get_surfaceSalinityData!}}}
-
 
 !***********************************************************************
 
